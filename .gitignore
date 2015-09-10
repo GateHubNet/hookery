@@ -1,0 +1,27 @@
+#vim
+*.swp
+tags
+
+#osx
+.DS_Store
+.DS_Store?
+
+# sublime
+*.sublime-project
+*.sublime-workspace
+
+# nix
+result
+
+# database
+/db_test
+/db_test-journal
+
+# test config
+config/test.yaml
+
+# webstorm
+.idea
+
+/var
+/node_modules

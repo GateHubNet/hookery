@@ -1,0 +1,38 @@
+{
+  "name": "hookery",
+  "version": "0.1.0",
+  "description": "Wtf, is this hookery in distributed manner with some rabbits and events?",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GateHubNet/hookery.git"
+  },
+  "keywords": [
+    "hookery",
+    "rabbits",
+    "events",
+    "rabbitmq"
+  ],
+  "author": "Jaka Hudoklin <jakahudoklin@gmail.com> (http://www.jakahudoklin.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/GateHubNet/hookery/issues"
+  },
+  "homepage": "https://github.com/GateHubNet/hookery",
+  "dependencies": {
+    "amqp": "^0.2.4",
+    "bluebird": "^2.10.0",
+    "chai-as-promised": "^5.1.0",
+    "hoek": "^2.14.0",
+    "lodash": "^3.10.1"
+  },
+  "devDependencies": {
+    "chai": "^3.2.0",
+    "mocha": "^2.3.2",
+    "sinon": "^1.16.1",
+    "uuid": "^2.0.1"
+  }
+}
