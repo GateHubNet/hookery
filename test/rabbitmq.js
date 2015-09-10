@@ -1,4 +1,4 @@
-// Tests rabbitmq backend (requires rabbitmq)
+// Tests ampq backend (requires ampq)
 'use strict';
 
 var expect = global.expect;
@@ -6,7 +6,7 @@ var expect = global.expect;
 var uuid = require('uuid');
 var Promise = require('bluebird');
 
-var RabbitMQ = require('../lib/backends/rabbitmq');
+var Ampq = require('../lib/backends/ampq');
 var Message = require('../lib/message');
 var Errors = require('../lib/errors');
 
@@ -16,7 +16,7 @@ function createQueueExchangePair(next) {
   this.exchgName = uuid.v4();
   this.queueName = uuid.v4();
 
-  this.rabbitmq.connection.then(function(conn) {
+  this.ampq.connection.then(function(conn) {
     conn.exchange(self.exchgName, { confirm: true, autoDelete: true }, function(exchg) {
       conn.queue(self.queueName,  { autoDelete: true }, function(queue) {
         queue.bind(self.exchgName, '#', function() {
@@ -29,16 +29,16 @@ function createQueueExchangePair(next) {
   });
 }
 
-describe('rabbitmq backend', function() {
-  it('should connect to rabbitmq', function() {
-    var rabbitmq = new RabbitMQ();
-    return expect(rabbitmq.connection).to.be.eventually.fulfilled;
+describe('ampq backend', function() {
+  it('should connect to ampq', function() {
+    var ampq = new Ampq();
+    return expect(ampq.connection).to.be.eventually.fulfilled;
   });
 
   it('should catch failed connection', function(next) {
-    var rabbitmq = new RabbitMQ({host: 'hacker.com',connectionTimeout: 10}, {reconnect: false});
+    var ampq = new Ampq({host: 'hacker.com',connectionTimeout: 10}, {reconnect: false});
 
-    rabbitmq.on('error', function(err) {
+    ampq.on('error', function(err) {
       expect(err).to.be.instanceOf(Errors.ConnectionError);
       next();
     });
@@ -46,19 +46,19 @@ describe('rabbitmq backend', function() {
 
   describe('sink', function() {
     beforeEach(function() {
-      this.rabbitmq = new RabbitMQ();
+      this.ampq = new Ampq();
     });
 
     beforeEach(createQueueExchangePair);
 
     it('should create exchange', function(next) {
-      var sink = this.rabbitmq.exchange('test' + uuid.v4());
+      var sink = this.ampq.exchange('test' + uuid.v4());
 
       sink.on('error', function(error) {
         next(error);
       });
 
-      expect(sink).to.be.instanceOf(RabbitMQ.sink),
+      expect(sink).to.be.instanceOf(Ampq.sink),
 
       sink.exchange().then(function(exchange) {
         next();
@@ -73,7 +73,7 @@ describe('rabbitmq backend', function() {
         expect(message).to.have.property('test');
       });
 
-      var sink = self.rabbitmq.exchange(self.exchgName);
+      var sink = self.ampq.exchange(self.exchgName);
 
       sink.on('error', function(error) {
         next(error);
@@ -92,14 +92,14 @@ describe('rabbitmq backend', function() {
 
   describe('queue', function() {
     beforeEach(function() {
-      this.rabbitmq = new RabbitMQ();
+      this.ampq = new Ampq();
     });
 
     beforeEach(createQueueExchangePair);
 
     it('should receive message from queue', function(next) {
       var self = this;
-      var source = this.rabbitmq
+      var source = this.ampq
         .queue(uuid.v4(), {'autoDelete': true})
         .bindTo(this.exchgName);
 
