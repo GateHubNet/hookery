@@ -64,11 +64,27 @@ describe('hookery', function() {
         this.source.onError(err);
       });
 
-      it('should recive messages', function(next) {
-        var msg = new Message('some.key', 'data');
+      it('should handle messages', function(next) {
+        var msg = new Message('some.value.key', 'data');
 
-        this.hookery.on('some.key', function(rmsg) {
+        this.hookery.on('some.{key}.*', function(rmsg, match) {
           expect(rmsg).to.be.equal(msg);
+          expect(match).to.have.property('key');
+          expect(match.key).to.be.equal('value');
+          next();
+        });
+
+        this.source.onMessage(msg);
+      });
+
+      it('should not handle message with wrong key', function(next) {
+        var msg = new Message('some.key', 'data');
+        var wrongStub = sinon.stub();
+
+        this.hookery.on('wrong.key', wrongStub);
+
+        this.hookery.on('*', function() {
+          expect(wrongStub).to.not.be.called;
           next();
         });
 
