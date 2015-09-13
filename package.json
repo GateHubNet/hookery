@@ -33,8 +33,6 @@
   "devDependencies": {
     "chai": "^3.2.0",
     "chai-things": "^0.2.0",
-    "dox": "^0.8.0",
-    "doxx": "^2.0.0",
     "jsdoc": "^3.3.2",
     "mocha": "^2.3.2",
     "sinon": "^1.16.1",
