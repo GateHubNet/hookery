@@ -4,7 +4,8 @@
   "description": "Wtf, is this hookery in distributed manner with some rabbits and events?",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "jsdoc": "jsdoc -R README.md -P package.json -r lib/* -c jsdoc.conf.json"
   },
   "repository": {
     "type": "git",
