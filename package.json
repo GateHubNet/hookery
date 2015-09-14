@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha",
-    "jsdoc": "jsdoc -R README.md -P package.json -r lib/* -c jsdoc.conf.json"
+    "jsdoc": "jsdoc -R README.md -P package.json -r lib/* -c jsdoc.conf.json",
+    "push-docs": "git push origin `git subtree split --prefix out/hookery/* docs`:gh-pages --force"
   },
   "repository": {
     "type": "git",
