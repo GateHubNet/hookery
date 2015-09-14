@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: backends/ampq.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: backends/ampq.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Errors.js
+ * @module Hookery.Amqp
+ */
+
+'use strict';
+
+var Util = require('util');
+var Amqp = require('amqp');
+var Promise = require('bluebird');
+var EventEmitter = require('events').EventEmitter;
+var Util = require('util');
+var _ = require('lodash');
+
+var Sink = require('../sink');
+var Source = require('../source');
+var Message = require('../message');
+var Errors = require('../errors');
+
+/**
+ * Ampq message
+ * @class
+ * @augments Message
+ */
+function AmpqMessage(message, messageObject, options) {
+  this.message = message;
+  this.messageObject = messageObject;
+  this.options = options;
+  this.state = 'published';
+  this.key = messageObject.routingKey;
+  this.data = message;
+}
+Util.inherits(AmpqMessage, Message);
+
+AmpqMessage.prototype.ack = function() {
+  this.messageObject.acknowledge();
+};
+
+AmpqMessage.prototype.reject = function(requeue) {
+  this.messageObject.reject(requeue || this.options.requeue);
+};
+
+/**
+ * Ampq sink
+ * @class
+ * @augments Message
+ * @param {Ampq} amqp Ampq instance
+ * @param {string} name Exchange name
+ * @param {Object=} options Ampq exchange options
+ */
+function AmpqSink(amqp, name, options) {
+  var self = this;
+
+  this.amqp = amqp;
+  this.name = name;
+  this.options = options || { autoDelete: true };
+  this.messageDefaultOptions = {};
+
+  this.amqp.connection.then(function(conn) {
+    conn.on('error', function(err) {
+      self.onError(err);
+    });
+  });
+}
+Util.inherits(AmpqSink, Sink);
+
+AmpqSink.prototype.exchange = function() {
+  var self = this;
+
+  var options = _.merge(this.options, { confirm: true });
+
+  if (this._exchange) {
+    return this._exchange;
+  } else {
+    return new Promise(function(res, rej) {
+      self.amqp.connection.then(function(conn) {
+        conn.exchange(self.name, options, function(exchange) {
+          self._exchange = exchange;
+          res(exchange);
+        });
+      });
+    });
+  }
+};
+
+AmpqSink.prototype.publish = function(msg, options) {
+  var self = this;
+  options = _.merge(this.messageDefaultOptions, options);
+
+  return this.exchange().then(function(exchange) {
+    return new Promise(function(res, rej) {
+      exchange.publish(msg.key, msg.data, options, function(err) {
+        if (err) {
+          return rej(new Errors.MessageError(msg));
+        }
+
+        msg.state = 'published'; // Mark message as published
+        msg.sink = self;
+        res(msg);
+      });
+    });
+  });
+};
+
+/**
+ * Marks rabbitmq exchange as durable
+ */
+AmpqSink.prototype.durable = function() {
+  this.options.durable = true;
+  return this;
+};
+
+/**
+ * Marks rabbitmq exchange messages as persistant
+ */
+AmpqSink.prototype.persistent = function() {
+  this.messageDefaultOptions.deliveryMode = 2;
+  return this;
+};
+
+/**
+ * Ampq source
+ * @class
+ * @augments Source
+ * @param {Ampq} amqp Ampq instance
+ * @param {string} name Exchange name
+ * @param {Object=} options Ampq queue options
+ */
+function AmpqSource(amqp, name, options) {
+  var self = this;
+
+  this.amqp = amqp;
+  this.name = name;
+  this.options = options || { autoDelete: true };
+  this.subscribeOptions = {};
+  this.messageOptions = {};
+  this._bindTo = '#';
+
+  this.amqp.connection.then(function(conn) {
+    conn.on('error', function(err) {
+      self.onError(err);
+    });
+  });
+}
+
+Util.inherits(AmpqSource, Source);
+
+AmpqSource.prototype.queue = function() {
+  var self = this;
+  if (this._queue) {
+    return this._queue;
+  } else {
+    return new Promise(function(res, rej) {
+      self.amqp.connection.then(function(conn) {
+        conn.queue(self.name, self.options, function(queue) {
+          self._queue = queue;
+          res(queue);
+        });
+      });
+    });
+  }
+};
+
+AmpqSource.prototype.subscribe = function() {
+  var self = this;
+
+  return this.queue().then(function(queue) {
+    return new Promise(function(res, rej) {
+      queue.bind(
+        self._exchange || 'amq.topic',
+        self._bindTo || '#',
+        function(ok) {
+          var options = _.merge(self.subscribeOptions, {});
+
+          queue.subscribe(
+            options, function(message, headers, deliveryInfo, messageObject) {
+              self.onMessage(
+                new AmpqMessage(message, messageObject, self.messageOptions)
+              );
+            }
+          );
+
+          res();
+        }
+      );
+    });
+  });
+};
+
+AmpqSource.prototype.bindTo = function(exchange, key) {
+  this._exchange = exchange;
+  this._bindTo = key;
+  return this;
+};
+
+/**
+ * Prefetch messages from queue
+ */
+AmpqSource.prototype.durable = function() {
+  this.options.durable = true;
+  return this;
+};
+
+/**
+ * Marks rabbitmq exchange messages as persistant
+ */
+AmpqSource.prototype.ack = function() {
+  this.subscribeOptions.ack = true;
+  return this;
+};
+
+/**
+ * Sets the number of messages to prefetch from rabbitmq queue
+ * @param {number=} [count=1] Number of messages to prefetch
+ */
+AmpqSource.prototype.prefetch = function(count) {
+  this.subscribeOptions.prefetchCount = count || 1;
+};
+
+/**
+ * Ampq class constructor
+ * @constructor
+ * @param {Object} config Ampq connection config
+ *  {@link https://github.com/postwait/node-amqp#connection options}
+ */
+function Ampq(config, otherConfig) {
+  var self = this;
+
+  var connection = Amqp.createConnection(
+    config || {url: 'amqp://guest:guest@localhost:5672'},
+    otherConfig || {}
+  );
+  this.connection = new Promise(function(res, rej) {
+    connection.on('ready', function() {
+      res(connection);
+    });
+
+    connection.on('error', function(err) {
+      self.emit('error', new Errors.ConnectionError(err));
+    });
+  });
+}
+Util.inherits(Ampq, EventEmitter);
+
+/**
+ * Gets rabbitmq exchange object
+ * @param {string} name Exchange name
+ * @param {Object=} options Exchange
+ *  {@link https://github.com/postwait/node-amqp#connectionexchangename-options-opencallback options}
+ * @return {AmpqSink} sink object usable with hookery
+ */
+Ampq.prototype.exchange = function(name, options) {
+  return new AmpqSink(this, name, options);
+};
+
+/**
+ * Gets rabbitmq queue object
+ * @param {string} name Queue name
+ * @param {Object=} options Queue
+ *  {@link https://github.com/postwait/node-amqp#connectionqueuename-options-opencallback options}
+ * @return {AmpqSource} source object usable with hookery
+ */
+Ampq.prototype.queue = function(name, options) {
+  return new AmpqSource(this, name, options);
+};
+
+Ampq.sink = AmpqSink;
+Ampq.source = AmpqSource;
+
+module.exports = Ampq;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="Hookery.module_Amqp.html">Amqp</a></li><li><a href="Hookery.module_Errors.html">Errors</a></li><li><a href="module-Hookery.html">Hookery</a></li></ul><h3>Classes</h3><ul><li><a href="Hookery.module_Amqp-Ampq.html">Ampq</a></li><li><a href="Hookery.module_Amqp-AmpqMessage.html">AmpqMessage</a></li><li><a href="Hookery.module_Amqp-AmpqSink.html">AmpqSink</a></li><li><a href="Hookery.module_Amqp-AmpqSource.html">AmpqSource</a></li><li><a href="Hookery.module_Errors-ConnectionError.html">ConnectionError</a></li><li><a href="Hookery.module_Errors-MessageError.html">MessageError</a></li><li><a href="Hookery.module_Errors-NotImplemented.html">NotImplemented</a></li><li><a href="Message.html">Message</a></li><li><a href="module-Hookery-Hookery.html">Hookery</a></li><li><a href="Sink.html">Sink</a></li><li><a href="Source.html">Source</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.2</a> on Mon Sep 14 2015 01:21:20 GMT+0200 (CEST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
