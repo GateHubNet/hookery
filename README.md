@@ -6,6 +6,8 @@ Wtf, is this hookery?
 
 Hookery is a simple distributed event emmiter library with nodejs.
 
+[API docs](http://gatehubnet.github.io/hookery/)
+
 ## Features
 
 - Multiple message source
