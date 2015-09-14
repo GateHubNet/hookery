@@ -1,6 +1,6 @@
 # Hookery
 
-Wtf, is this hookery?"
+Wtf, is this hookery?
 
 ## Description
 
