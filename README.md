@@ -1,6 +1,6 @@
 # Hookery
 
-Wtf, is this hookery in distributed manner with some rabbits and events?"
+Wtf, is this hookery?"
 
 ## Description
 
@@ -8,14 +8,16 @@ Hookery is a simple distributed event emmiter library with nodejs.
 
 ## Features
 
-- Support for multiple backends: `rabbitmq`
-
+- Multiple message source
+- Multiple message sinks
+- Smart hooks
+- Support for multiple message passing backends: `ampq`
 
 ## Usage
 
 ```
 var Hookery = require('hookery');
-var RabbitMQ = Hookery.RabbitMQ;
+var Ampq = Hookery.Ampq;
 
 function Bunny(msg) {
   this.msg = msg;
@@ -26,11 +28,11 @@ Bunny.prototype.play = function() {
   this.msg.ack();
 }
 
-var rabbit = new Hookery.RabbitMQ();
+var ampq = new Hookery.Ampq();
 
 var hook = new Hookery();
-hook.to(rabbit.exchange('bunnies').durable().key('bunnies.*'));
-hook.from(rabbit.queue('bunnies').bindTo('bunnies').cast(Bunny));
+hook.to(ampq.exchange('bunnies').durable().key('bunnies.*'));
+hook.from(ampq.queue('bunnies').bindTo('bunnies').cast(Bunny));
 
 hook.on('bunnies.{name}.info', function(name, bunny) {
   bunny.play();
